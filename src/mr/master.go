@@ -14,6 +14,11 @@ type Master struct {
 
 // Your code here -- RPC handlers for the worker to call.
 
+func (m *Master) AllocateTask(args *Args, reply *Reply) error {
+	return nil
+}
+
+
 //
 // an example RPC handler.
 //

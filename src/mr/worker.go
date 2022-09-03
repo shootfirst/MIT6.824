@@ -4,6 +4,8 @@ import "fmt"
 import "log"
 import "net/rpc"
 import "hash/fnv"
+import "os"
+import "io/ioutil"
 
 
 //
@@ -35,6 +37,33 @@ func Worker(mapf func(string, string) []KeyValue,
 
 	// uncomment to send the Example RPC to the master.
 	// CallExample()
+
+	// we beg master to allocate task 
+	args := Args{}
+	reply := Reply{}
+	call("Master.AllocateTask", &args, &reply)
+	
+	// now we get task form master
+	file, err := os.Open(reply.filename)
+
+	// there is not task in master or we can not cantact with master
+	if err != nil {
+		fmt.Println(err)
+	}
+	content, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Fatalf("cannot read %v", reply.filename)
+	}
+	file.Close()
+
+	// now we get the content, call map function
+	kva := mapf(reply.filename, string(content))
+
+
+
+	
+
+
 
 }
 
@@ -69,12 +98,14 @@ func CallExample() {
 func call(rpcname string, args interface{}, reply interface{}) bool {
 	// c, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1234")
 	sockname := masterSock()
+	// c is *Client
 	c, err := rpc.DialHTTP("unix", sockname)
 	if err != nil {
 		log.Fatal("dialing:", err)
 	}
 	defer c.Close()
 
+	// rpcname is server method to call, in example above is Master.Example
 	err = c.Call(rpcname, args, reply)
 	if err == nil {
 		return true
