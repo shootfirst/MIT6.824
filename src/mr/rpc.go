@@ -28,8 +28,15 @@ type Args struct {
 	X string
 }
 
-type Reply struct {
-	Y string
+type Job struct {
+	// 工作类型，0为wait等待，1为map任务，2为reduce任务
+	jobtype int
+	// 任务文件
+	files []string
+	// 任务号，对于map任务用于生成存储中间kv的文件名，而对于reduce任务用于获取文件名和生成最终输出文件名
+	Xth int
+
+	nreduce int
 }
 
 

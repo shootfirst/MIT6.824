@@ -10,11 +10,18 @@ import "net/http"
 type Master struct {
 	// Your definitions here.
 
+	// record all of the task file
+	files []string
+	// record the task we have finished
+	have_finish []string
+	// record the task and worker map relationship
+	task_toworker map[string]int
+
 }
 
 // Your code here -- RPC handlers for the worker to call.
 
-func (m *Master) AllocateTask(args *Args, reply *Reply) error {
+func (m *Master) Handler(args *Args, reply *Job) error {
 	return nil
 }
 
@@ -54,7 +61,9 @@ func (m *Master) Done() bool {
 	ret := false
 
 	// Your code here.
-
+	if len(m.have_finish) == len(m.files) {
+		ret = true
+	}
 
 	return ret
 }
@@ -68,6 +77,7 @@ func MakeMaster(files []string, nReduce int) *Master {
 	m := Master{}
 
 	// Your code here.
+	m.files = files
 
 
 	m.server()

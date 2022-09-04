@@ -6,6 +6,8 @@ import "net/rpc"
 import "hash/fnv"
 import "os"
 import "io/ioutil"
+import "sort"
+import "encoding/json"
 
 
 //
@@ -15,6 +17,16 @@ type KeyValue struct {
 	Key   string
 	Value string
 }
+
+// for sorting by key.
+type ByKey []KeyValue
+
+// for sorting by key.
+func (a ByKey) Len() int           { return len(a) }
+func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
+
+
 
 //
 // use ihash(key) % NReduce to choose the reduce
@@ -40,30 +52,132 @@ func Worker(mapf func(string, string) []KeyValue,
 
 	// we beg master to allocate task 
 	args := Args{}
-	reply := Reply{}
-	call("Master.AllocateTask", &args, &reply)
+	reply := Job{}
+	call("Master.Handler", &args, &reply)
+
+	if reply.jobtype == 0 {
+		fmt.Println("wait...")
+	} else if reply.jobtype == 1 {
+		DoMap(mapf, reply)
+	} else if reply.jobtype == 2 {
+		DoReduce(reducef, reply)
+	} else {
+		fmt.Println("wrong...")
+	}
 	
-	// now we get task form master
-	file, err := os.Open(reply.filename)
-
-	// there is not task in master or we can not cantact with master
-	if err != nil {
-		fmt.Println(err)
-	}
-	content, err := ioutil.ReadAll(file)
-	if err != nil {
-		log.Fatalf("cannot read %v", reply.filename)
-	}
-	file.Close()
-
-	// now we get the content, call map function
-	kva := mapf(reply.filename, string(content))
-
-
+	
 
 	
 
 
+	
+
+	
+
+	
+
+
+
+}
+
+func DoMap(mapf func(string, string) []KeyValue, job Job) {
+
+	// check if it is the right task
+	if job.jobtype != 1 {
+		fmt.Println("the job type should be map!!!")
+		return
+	}
+	
+	intermediate := []KeyValue{}
+	for _, filename := range job.files {
+		// open and read the file correctly
+		file, err := os.Open(filename)
+		if err != nil {
+			log.Fatalf("cannot open %v", filename)
+		}
+		content, err := ioutil.ReadAll(file)
+		if err != nil {
+			log.Fatalf("cannot read %v", filename)
+		}
+		// close file
+		file.Close()
+
+		// now we get the content, call map function and sort the intermediate kv
+		kva := mapf(filename, string(content))
+		intermediate = append(intermediate, kva...)
+
+	}
+	sort.Sort(ByKey(intermediate))
+	
+	// prepare hashtable
+	hashkey2kv := make([][]KeyValue, job.nreduce)
+  	for _, kv := range intermediate {
+		hashkey2kv[ihash(kv.Key) % job.nreduce] = append(hashkey2kv[ihash(kv.Key) % job.nreduce], kv)
+	}
+
+	// write the intermediate kv into  each mr-X-Y file
+	for i := 0; i < job.nreduce; i++ {
+		// create or open specified file
+		oname := fmt.Sprintf("%s%d%s%d", "mr-", job.Xth, "-", i)
+		ofile, _ := os.Create(oname)
+		// write kv
+		enc := json.NewEncoder(ofile)
+		for _, kv := range hashkey2kv[i] {
+			en_err := enc.Encode(&kv)
+			if en_err != nil {
+				log.Fatalf("json encode error")
+			} 
+		}
+		// close file
+		ofile.Close()
+	}
+	
+}
+
+func DoReduce(reducef func(string, []string) string, job Job) {
+
+	// check if it is the right task
+	if job.jobtype != 2 {
+		fmt.Println("the job type should be reduce!!!")
+		return
+	}
+
+	kva := []KeyValue{}
+	for _, filename := range job.files {
+		file, _ := os.Open(filename)
+		dec := json.NewDecoder(file)
+  		for {
+  		  	var kv KeyValue
+  		  	if err := dec.Decode(&kv); err != nil {
+				fmt.Println("decode error!!!")
+  		  		break
+  		  	}
+  		  	kva = append(kva, kv)
+  		}
+	}
+
+	sort.Sort(ByKey(kva))
+
+	oname := fmt.Sprintf("%s%d", "mr-out-", job.Xth)
+	ofile, _ := os.Create(oname)
+
+	i := 0
+	for i < len(kva) {
+		j := i + 1
+		for j < len(kva) && kva[j].Key == kva[i].Key {
+			j++
+		}
+		values := []string{}
+		for k := i; k < j; k++ {
+			values = append(values, kva[k].Value)
+		}
+		output := reducef(kva[i].Key, values)
+
+		// this is the correct format for each line of Reduce output.
+		fmt.Fprintf(ofile, "%v %v\n", kva[i].Key, output)
+
+		i = j
+	}
 
 }
 
