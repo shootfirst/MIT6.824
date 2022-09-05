@@ -29,10 +29,41 @@ work的实现较为简单
   
   + 按实验提示要求调用Encode存入相关文件，注意文件命名规范
 
+  + 调用call函数告知master任务完成
+
 - reduce则调用reduce处理函数
 
-  + 
+  + 按实验提示Decode所有通过job传入的存储中间kv的文件
+
+  + 将kv排序
+
+  + 按taskid创建文件，调用reduce函数处理，将结果写入文件
+
+  + 调用call函数告知master任务完成
 
 - wait则等待2s
 
 - kill则结束当前work
+
+- 循环请求直到被传入kill
+
+
+### master
+
+master的实现则是核心
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
