@@ -8,48 +8,48 @@ MIT2020年秋分布式系统实验
 
 数据结构：
 
-type Request struct {
-	RQ RequestType
-	JobType TaskType
-	Xth     int
-}
-
-type Job struct {
-	JobType TaskType
-	Files   []string
-	Xth     int
-	Nreduce      int
-}
+		type Request struct {
+			RQ RequestType
+			JobType TaskType
+			Xth     int
+		}
+		
+		type Job struct {
+			JobType TaskType
+			Files   []string
+			Xth     int
+			Nreduce      int
+		}
 
 上述两个数据结构作为rpc的两个参数，需要注意一点就是这两个结构体的所有字段都必须以大写字母开头，否则go的底层是不会序列化成功的
 
-type JobInfo struct {
-	jobstatus JobStatus
-	start time.Time
-	jobptr *Job
-}
-
+		type JobInfo struct {
+			jobstatus JobStatus
+			start time.Time
+			jobptr *Job
+		}
+		
 这个则是记录job的所有信息，是还没有分配，分配中还是已经完成，分配出去的时间以及指向对应Job的指针。
 
-type Master struct {
-	// Your definitions here.
-	
-	// these two variables are only readable
-	nm int
-	nr int
-
-	// protect 
-	mutex sync.Mutex
-
-	status PhaseType
-
-	MapChannel chan *Job
-	ReduceChannel chan *Job
-
-	mapJobInfo [] JobInfo
-	reduceJobInfo [] JobInfo
-
-}
+		type Master struct {
+			// Your definitions here.
+			
+			// these two variables are only readable
+			nm int
+			nr int
+		
+			// protect 
+			mutex sync.Mutex
+		
+			status PhaseType
+		
+			MapChannel chan *Job
+			ReduceChannel chan *Job
+		
+			mapJobInfo [] JobInfo
+			reduceJobInfo [] JobInfo
+		
+		}
 
 而这个则是master结构体
 
