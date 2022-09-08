@@ -45,7 +45,7 @@ work的实现较为简单
 
 - kill则结束当前work
 
-- 循环请求直到被传入kill
+- 循环请求直到被传入kill,则worker进程退出
 
 
 ### master
