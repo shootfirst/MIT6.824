@@ -8,36 +8,73 @@ package mr
 
 import "os"
 import "strconv"
+import "time"
 
 //
 // example to show how to declare the arguments
 // and reply for an RPC.
 //
 
-type ExampleArgs struct {
-	X int
-}
+// type ExampleArgs struct {
+// 	X int
+// }
 
-type ExampleReply struct {
-	Y int
-}
+// type ExampleReply struct {
+// 	Y int
+// }
 
 // Add your RPC definitions here.
 
-type Args struct {
-	X string
-}
+// define task type
+type TaskType int 
+const (
+	MAP_TASK = iota
+	REDUCE_TASK
+	WAIT_TASK
+	KILL_TASK
+)
+
+// define task type
+type RequestType int 
+const (
+	ACQUIRE = iota
+	SUBMIT
+)
+
+// define master phase type
+type PhaseType int 
+const (
+	MAP_PHASE = iota
+	REDUCE_PHASE
+	FINISH_PHASE
+)
+
+type JobStatus int
+const (
+	WAITING = iota
+	PROCESSING
+	FINISHED
+)
 
 type Job struct {
-	// 工作类型，0为wait等待，1为map任务，2为reduce任务
-	jobtype int
-	// 任务文件
-	files []string
-	// 任务号，对于map任务用于生成存储中间kv的文件名，而对于reduce任务用于获取文件名和生成最终输出文件名
-	Xth int
-
-	nreduce int
+	JobType TaskType
+	Files   []string
+	Xth     int
+	Nreduce      int
 }
+
+type JobInfo struct {
+	jobstatus JobStatus
+	start time.Time
+	jobptr *Job
+}
+
+type Request struct {
+	RQ RequestType
+	JobType TaskType
+	Xth     int
+}
+
 
 
 // Cook up a unique-ish UNIX-domain socket name

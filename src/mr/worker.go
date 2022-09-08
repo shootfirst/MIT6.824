@@ -8,6 +8,7 @@ import "os"
 import "io/ioutil"
 import "sort"
 import "encoding/json"
+import "time"
 
 
 //
@@ -51,45 +52,42 @@ func Worker(mapf func(string, string) []KeyValue,
 	// CallExample()
 
 	// we beg master to allocate task 
-	args := Args{}
-	reply := Job{}
-	call("Master.Handler", &args, &reply)
+	for {
+		request := Request{}
+		request.RQ = ACQUIRE
 
-	if reply.jobtype == 0 {
-		fmt.Println("wait...")
-	} else if reply.jobtype == 1 {
-		DoMap(mapf, reply)
-	} else if reply.jobtype == 2 {
-		DoReduce(reducef, reply)
-	} else {
-		fmt.Println("wrong...")
+		job:= Job{}
+		call("Master.Handler", &request, &job)
+		
+		switch job.JobType {
+		case MAP_TASK:
+			fmt.Println("get the map job:", job)
+			DoMap(mapf, job)
+		case REDUCE_TASK:
+			DoReduce(reducef, job)
+		case WAIT_TASK:
+			fmt.Println("wait for 2 seconds ...")
+			time.Sleep(2 * time.Second)
+		case KILL_TASK:
+			fmt.Println("no tasks, kill self ...")
+			return
+		default:
+			fmt.Println("undefined job type ...")
+		}
 	}
-	
-	
-
-	
-
-
-	
-
-	
-
-	
-
-
 
 }
 
 func DoMap(mapf func(string, string) []KeyValue, job Job) {
 
 	// check if it is the right task
-	if job.jobtype != 1 {
+	if job.JobType != MAP_TASK {
 		fmt.Println("the job type should be map!!!")
 		return
 	}
 	
 	intermediate := []KeyValue{}
-	for _, filename := range job.files {
+	for _, filename := range job.Files {
 		// open and read the file correctly
 		file, err := os.Open(filename)
 		if err != nil {
@@ -110,16 +108,17 @@ func DoMap(mapf func(string, string) []KeyValue, job Job) {
 	sort.Sort(ByKey(intermediate))
 	
 	// prepare hashtable
-	hashkey2kv := make([][]KeyValue, job.nreduce)
+	hashkey2kv := make([][]KeyValue, job.Nreduce)
   	for _, kv := range intermediate {
-		hashkey2kv[ihash(kv.Key) % job.nreduce] = append(hashkey2kv[ihash(kv.Key) % job.nreduce], kv)
+		hashkey2kv[ihash(kv.Key) % job.Nreduce] = append(hashkey2kv[ihash(kv.Key) % job.Nreduce], kv)
 	}
 
 	// write the intermediate kv into  each mr-X-Y file
-	for i := 0; i < job.nreduce; i++ {
+	for i := 0; i < job.Nreduce; i++ {
 		// create or open specified file
 		oname := fmt.Sprintf("%s%d%s%d", "mr-", job.Xth, "-", i)
-		ofile, _ := os.Create(oname)
+		temp := fmt.Sprintf("%d%s%d", job.Xth, "-", i)
+		ofile, _ := ioutil.TempFile(".", temp)
 		// write kv
 		enc := json.NewEncoder(ofile)
 		for _, kv := range hashkey2kv[i] {
@@ -128,28 +127,36 @@ func DoMap(mapf func(string, string) []KeyValue, job Job) {
 				log.Fatalf("json encode error")
 			} 
 		}
+		// atomically rename
+		os.Rename("./" + ofile.Name(), "./" + oname)
 		// close file
 		ofile.Close()
 	}
 	
+	// tell the master that we finished the task
+	request := Request{}
+	request.RQ = SUBMIT
+	request.JobType = MAP_TASK
+	request.Xth = job.Xth
+
+	call("Master.Handler", &request, &job)
 }
 
 func DoReduce(reducef func(string, []string) string, job Job) {
 
 	// check if it is the right task
-	if job.jobtype != 2 {
+	if job.JobType != REDUCE_TASK {
 		fmt.Println("the job type should be reduce!!!")
 		return
 	}
 
 	kva := []KeyValue{}
-	for _, filename := range job.files {
+	for _, filename := range job.Files {
 		file, _ := os.Open(filename)
 		dec := json.NewDecoder(file)
   		for {
   		  	var kv KeyValue
   		  	if err := dec.Decode(&kv); err != nil {
-				fmt.Println("decode error!!!")
   		  		break
   		  	}
   		  	kva = append(kva, kv)
@@ -159,7 +166,9 @@ func DoReduce(reducef func(string, []string) string, job Job) {
 	sort.Sort(ByKey(kva))
 
 	oname := fmt.Sprintf("%s%d", "mr-out-", job.Xth)
-	ofile, _ := os.Create(oname)
+	
+	temp := fmt.Sprintf("%d", job.Xth)
+	ofile, _ := ioutil.TempFile(".", temp)
 
 	i := 0
 	for i < len(kva) {
@@ -179,30 +188,42 @@ func DoReduce(reducef func(string, []string) string, job Job) {
 		i = j
 	}
 
+	// atomically rename
+	os.Rename("./" + ofile.Name(), "./" + oname)
+	// close file
+	ofile.Close()
+
+	// tell the master that we finished the task
+	request := Request{}
+	request.RQ = SUBMIT
+	request.JobType = REDUCE_TASK
+	request.Xth = job.Xth
+	call("Master.Handler", &request, &job)
+
 }
 
-//
-// example function to show how to make an RPC call to the master.
-//
-// the RPC argument and reply types are defined in rpc.go.
-//
-func CallExample() {
+// //
+// // example function to show how to make an RPC call to the master.
+// //
+// // the RPC argument and reply types are defined in rpc.go.
+// //
+// func CallExample() {
 
-	// declare an argument structure.
-	args := ExampleArgs{}
+// 	// declare an argument structure.
+// 	args := ExampleArgs{}
 
-	// fill in the argument(s).
-	args.X = 99
+// 	// fill in the argument(s).
+// 	args.X = 99
 
-	// declare a reply structure.
-	reply := ExampleReply{}
+// 	// declare a reply structure.
+// 	reply := ExampleReply{}
 
-	// send the RPC request, wait for the reply.
-	call("Master.Example", &args, &reply)
+// 	// send the RPC request, wait for the reply.
+// 	call("Master.Example", &args, &reply)
 
-	// reply.Y should be 100.
-	fmt.Printf("reply.Y %v\n", reply.Y)
-}
+// 	// reply.Y should be 100.
+// 	fmt.Printf("reply.Y %v\n", reply.Y)
+// }
 
 //
 // send an RPC request to the master, wait for the response.
