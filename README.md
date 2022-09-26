@@ -359,7 +359,8 @@ timer函数使用select，一旦定时器超时，通过channel通知timer函数
 
 + 若返回的term比currentterm大，更改currentterm，修改state为follower，清空votefor，放锁返回
 
-+ 否则，我们判断append是否成功，成功我们则重置对应的nextIndex和matchIndex，调用leaderCommit对commit相关事务处理，该函数必须要马上返回，返回后结束函数
++ 否则，我们判断append是否成功，成功我们则重置对应的nextIndex和matchIndex，判断能否commit，这里的判断条件很重要，可看代码。能调用leaderCommit对commit相关
+  事务处理，该函数必须要马上返回，返回后结束函数
 
 + 若不成功，我们使用返回的ConflictTermIdx重置对应的nextIndex，重新调用makeAppendEntriesArgs新建args回到第三步循环发送
 
