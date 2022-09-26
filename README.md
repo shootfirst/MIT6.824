@@ -205,7 +205,22 @@ worker启动后调用Worker函数，该函数结束则worker结束
 和上面几乎一样，不赘述
 
 
+
+
+
 ## lab2
+
+参考：
+
+https://github.com/maemual/raft-zh_cn/blob/master/raft-zh_cn.md
+
+https://github.com/OneSizeFitsQuorum/MIT6.824-2021/blob/master/docs/lab2.md
+
+https://pdos.csail.mit.edu/6.824/labs/raft-locking.txt
+
+https://pdos.csail.mit.edu/6.824/labs/raft-structure.txt
+
+https://thesquareplanet.com/blog/students-guide-to-raft/
 
 实验二是实现raft算法。很虐的一个实验。首先这是raft结构体，变量名和raft论文中的一样。
 
