@@ -188,10 +188,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	defer rf.persist()
-
-	// DPrintf("{Node %v} AppendEntries!!! rf.currentTerm = %v args.Term = %v, args.LeaderId = %v, args.PrevLogIndex = %v, args.PrevLogTerm = %v, \n", 
-	// 						rf.me, rf.currentTerm, args.Term, args.LeaderId, args.PrevLogIndex, args.PrevLogTerm)
-	// DPrintf("***************************************************************************************************\n")
 	if rf.currentTerm > args.Term {
 		reply.Term = rf.currentTerm
 		reply.Success = false
@@ -202,8 +198,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		rf.votedFor = -1    
 		rf.state = FOLLOWER
 		rf.currentTerm = args.Term
-		// DPrintf("{Node %v} refresh!!!\n", rf.me)
-		// DPrintf("***************************************************************************************************\n")
 		rf.refreshElectionTime()
 	}
 
@@ -231,7 +225,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		rf.log = append(rf.log[0 : args.PrevLogIndex + 1], args.Entries...)
 		reply.Term = rf.currentTerm
 		reply.Success = true
-		// DPrintf("{Node %v} rf.log[1] %v\n", rf.me, rf.log[len(rf.log) - 1].Command)
 	}
 	
 
@@ -251,32 +244,22 @@ func (rf *Raft) checkAppendCondition(prevLogIndex int, prevLogTerm int) bool {
 }
 
 func (rf *Raft) append2peer(peer int) {
-	// DPrintf("{Node %v} peer %v currentTerm %v i can not breath1\n", rf.me, peer, rf.currentTerm)
-	// DPrintf("***************************************************************************************************\n")
 	rf.mu.Lock()
 	DPrintf("{Node %v} append2peer %v  rf.state = %v rf.currentTerm = %v, rf.commitIndex = %v len(rf.log) = %v\n", rf.me, peer, rf.state, rf.currentTerm, rf.commitIndex, len(rf.log))
 	DPrintf("***************************************************************************************************\n")
 	args := rf.makeAppendEntriesArgs(rf.nextIndex[peer])
 	if rf.state != LEADER {
-		// DPrintf("{Node %v} peer %v currentTerm %v i can breath1\n", rf.me, peer, rf.currentTerm)
-		// DPrintf("***************************************************************************************************\n")
 		rf.mu.Unlock()
 		return
 	}
-	// DPrintf("{Node %v} peer %v currentTerm %v i can breath1\n", rf.me, peer, rf.currentTerm)
-	// DPrintf("***************************************************************************************************\n")
 	rf.mu.Unlock()
 	reply := new(AppendEntriesReply)
 	
 
 	for !rf.killed() {
 		if rf.sendAppendEntries(peer, &args, reply) {
-			// DPrintf("{Node %v} peer %v currentTerm %v i can not breath2\n", rf.me, peer, rf.currentTerm)
-			// DPrintf("***************************************************************************************************\n")
 			rf.mu.Lock()
 			if rf.state != LEADER {
-			// 	DPrintf("{Node %v} peer %v currentTerm %v i can breath2\n", rf.me, peer, rf.currentTerm)
-			// DPrintf("***************************************************************************************************\n")
 				rf.mu.Unlock()
 				return
 			}
@@ -284,8 +267,6 @@ func (rf *Raft) append2peer(peer int) {
 			
 
 			if args.Term < rf.currentTerm {
-			// 	DPrintf("{Node %v} peer %v currentTerm %v i can breath2\n", rf.me, peer, rf.currentTerm)
-			// DPrintf("***************************************************************************************************\n")
 				rf.mu.Unlock()
 				return
 			}
@@ -297,8 +278,6 @@ func (rf *Raft) append2peer(peer int) {
 				rf.state = FOLLOWER
 				rf.votedFor = -1
 				rf.persist()
-			// 	DPrintf("{Node %v} peer %v currentTerm %v i can breath2\n", rf.me, peer, rf.currentTerm)
-			// DPrintf("***************************************************************************************************\n")
 				rf.mu.Unlock()
 				return
 			}
@@ -313,8 +292,6 @@ func (rf *Raft) append2peer(peer int) {
 				if len(args.Entries) > 0 && args.Entries[len(args.Entries) - 1].Term == rf.currentTerm {
 					rf.leaderCommit()
 				}
-			// 	DPrintf("{Node %v} peer %v currentTerm %v i can breath2\n", rf.me, peer, rf.currentTerm)
-			// DPrintf("***************************************************************************************************\n")
 				rf.mu.Unlock()
 				return
 			} else {
@@ -322,8 +299,6 @@ func (rf *Raft) append2peer(peer int) {
 				rf.nextIndex[peer] = reply.ConflictTermIdx
 				args = rf.makeAppendEntriesArgs(rf.nextIndex[peer])
 				reply = new(AppendEntriesReply)
-			// 	DPrintf("{Node %v} peer %v currentTerm %v i can breath2\n", rf.me, peer, rf.currentTerm)
-			// DPrintf("***************************************************************************************************\n")
 				rf.mu.Unlock()
 			}
 		}
@@ -364,8 +339,6 @@ func (rf *Raft) boardcast(ifHeartBeat bool) {
 		if ifHeartBeat {
 			go rf.append2peer(peer)
 		} else {
-			// DPrintf("{Node %v} currentTerm %v signal peer %v \n", rf.me, rf.currentTerm, peer)
-			// DPrintf("***************************************************************************************************\n")
 			rf.appendCond[peer].Signal()
 		}
 	}
@@ -409,8 +382,6 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	defer rf.persist()
-	// DPrintf("{Node %v} receive RequestVote!!!  rf.currentTerm = %v args.Term = %v args.CandidateId = %v\n", rf.me, rf.currentTerm, args.Term, args.CandidateId)
-	// DPrintf("***************************************************************************************************\n")
 
 	// if candidate's term is smaller than mine, reject
 	if args.Term < rf.currentTerm {
@@ -420,8 +391,6 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	// if rpc request or response contains term T > currentTerm, set curremtTerm to T and convert to FOLLOWERS
 	if args.Term > rf.currentTerm {
-		// DPrintf("{Node %v} RequestVote change currentTerm %v to %v\n", rf.me, rf.currentTerm, args.Term)
-		// DPrintf("***************************************************************************************************\n")
 		rf.currentTerm = args.Term
 		rf.state = FOLLOWER
 		rf.votedFor = -1
@@ -472,8 +441,6 @@ func (rf *Raft) KickOffElection() {
 				if rf.state == CANDIDATE && reply.Term == rf.currentTerm && args.Term == rf.currentTerm {
 					if reply.VoteGranted {
 						votecnt += 1
-						// DPrintf("{Node %v} currentTerm %v receive args.Term %v, reply.Term %v, reply.VoteGranted %v votecnt %v\n", rf.me, rf.currentTerm, args.Term, reply.Term, reply.VoteGranted, votecnt)
-						// DPrintf("***************************************************************************************************\n")
 						if votecnt >= len(rf.peers) / 2 {
 							rf.convert2Leader()
 							rf.boardcast(true)
@@ -484,8 +451,6 @@ func (rf *Raft) KickOffElection() {
 				}
 				// if rpc request or response contains term T > currentTerm, set curremtTerm to T and convert to FOLLOWERS
 				if reply.Term > rf.currentTerm {
-					// DPrintf("{Node %v}  KickOffElection change currentTerm %v to %v\n", rf.me, rf.currentTerm, reply.Term)
-					// DPrintf("***************************************************************************************************\n")
 					rf.currentTerm = reply.Term
 					rf.votedFor = -1
 					rf.state = FOLLOWER
@@ -584,15 +549,11 @@ func (rf *Raft) timer() {
 	for !rf.killed() {
 		select {
 		case <- rf.heartBeatTime.C:
-			// DPrintf("{Node %v} i can not breath heartbeat\n", rf.me)
-			// DPrintf("***************************************************************************************************\n")
 			rf.mu.Lock()
 			if rf.state == LEADER {
 				rf.boardcast(true)
 				rf.refreshHeartBeatTime()
 			}
-			// DPrintf("{Node %v} i can breath heartbeat\n", rf.me)
-			// DPrintf("***************************************************************************************************\n")
 			rf.mu.Unlock()
 
 		case <- rf.electionTime.C:
@@ -629,13 +590,6 @@ func (rf *Raft) applyLogs() {
 		rf.mu.Unlock()
 
 		for _, entry := range slice {
-			// // ------------------------------------------
-			// if entry.Command == -1 {
-			// 	DPrintf("{Node %v} jump entry.Index %v\n", rf.me, entry.Index)
-			// 	DPrintf("***************************************************************************************************\n")
-			// 	continue
-			// }
-			// // ------------------------------------------
 			rf.applyCh <- ApplyMsg {
 				CommandValid: true,
 				Command: entry.Command,
@@ -718,7 +672,6 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	}
 
 	rf.log = append(rf.log, entry)
-	// DPrintf("{Node %v} rf.log[1] %v\n", rf.me, rf.log[1].Command)
 	rf.nextIndex[rf.me] = index + 1
 	rf.matchIndex[rf.me] = index
 
