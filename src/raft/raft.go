@@ -163,6 +163,10 @@ func (rf *Raft) readPersist(data []byte) {
 }
 
 
+
+
+
+// about append vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 type AppendEntriesArgs struct {
 	Term	        int
 	LeaderId	    int
@@ -179,7 +183,6 @@ type AppendEntriesReply struct {
 	ConflictTermIdx int
 }
 
-// lock
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	
 	rf.mu.Lock()
@@ -243,13 +246,10 @@ func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *Ap
 	return ok
 }
 
-
 func (rf *Raft) checkAppendCondition(prevLogIndex int, prevLogTerm int) bool {
 	return len(rf.log) <= prevLogIndex || rf.log[prevLogIndex].Term != prevLogTerm
 }
 
-
-// lock
 func (rf *Raft) append2peer(peer int) {
 	// DPrintf("{Node %v} peer %v currentTerm %v i can not breath1\n", rf.me, peer, rf.currentTerm)
 	// DPrintf("***************************************************************************************************\n")
@@ -371,48 +371,23 @@ func (rf *Raft) boardcast(ifHeartBeat bool) {
 	}
 }
 
-func (rf *Raft) leaderCommit() {
-	start := rf.commitIndex
-	end := rf.log[len(rf.log) - 1].Index
-	// DPrintf("{Node %v} currentTerm %v yesyes start %v end %v\n", rf.me, rf.currentTerm, start, end)
-	// DPrintf("***************************************************************************************************\n")
-	for start < end {
-		cnt := 0
-		for peer := range rf.peers {
-			if rf.matchIndex[peer] >= start + 1 {
-				cnt += 1
-			} 
-		}
-
-		if cnt > len(rf.peers) / 2 {
-			start++
-		} else {
-			break
-		}
+func (rf *Raft) refreshHeartBeatTime() {
+	if rf.heartBeatTime == nil {
+		rf.heartBeatTime = time.NewTimer(125 * time.Millisecond)
+	} else {
+		rf.heartBeatTime.Reset(125 * time.Millisecond)
 	}
-
-	// DPrintf("{Node %v} currentTerm %v yesyes\n", rf.me, rf.currentTerm)
-	// DPrintf("***************************************************************************************************\n")
-	if rf.commitIndex < start {
-		
-		DPrintf("{Node %v} currentTerm %v leaderCommit rf.commitIndex %v to start %v\n", rf.me, rf.currentTerm, rf.commitIndex, start)
-		DPrintf("***************************************************************************************************\n")
-		rf.commitIndex = start
-		// signal
-		rf.applyCond.Signal()
-	}
-	
 }
-
-func (rf *Raft) followerCommit(leaderCommit int) {
-	rf.commitIndex = leaderCommit
-	// signal
-	rf.applyCond.Signal()
-}
+// vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
 
 
 
+
+
+
+
+// about election =============================================================================
 type RequestVoteArgs struct {
 	// Your data here (2A, 2B).
 
@@ -429,7 +404,6 @@ type RequestVoteReply struct {
 	VoteGranted     bool 
 }
 
-// lock
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
 	rf.mu.Lock()
@@ -474,7 +448,6 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 	return ok
 }
 
-// lock
 func (rf *Raft) KickOffElection() {
 	votecnt := 0
 	DPrintf("{Node %v} KickOffElection!!!  rf.state = %v rf.currentTerm = %v\n", rf.me, rf.state, rf.currentTerm)
@@ -514,6 +487,7 @@ func (rf *Raft) KickOffElection() {
 					// DPrintf("{Node %v}  KickOffElection change currentTerm %v to %v\n", rf.me, rf.currentTerm, reply.Term)
 					// DPrintf("***************************************************************************************************\n")
 					rf.currentTerm = reply.Term
+					rf.votedFor = -1
 					rf.state = FOLLOWER
 					rf.persist()
 				}
@@ -541,11 +515,6 @@ func (rf *Raft) convert2Leader() {
 	}
 }
 
-
-
-
-
-
 func (rf *Raft) refreshElectionTime() {
 	n, _ := rand.Int(rand.Reader, big.NewInt(150))
 	num := n.String()
@@ -557,35 +526,73 @@ func (rf *Raft) refreshElectionTime() {
 	}
 }
 
-func (rf *Raft) refreshHeartBeatTime() {
-	if rf.heartBeatTime == nil {
-		rf.heartBeatTime = time.NewTimer(125 * time.Millisecond)
-	} else {
-		rf.heartBeatTime.Reset(125 * time.Millisecond)
-	}
-}
-
 func (rf *Raft) checkVoteCondition(lastLogIndex int, lastLogTerm int) bool {
 	lastIndex, lastTerm := rf.getlastIndexAndTerm()
 	return lastTerm < lastLogTerm || (lastTerm == lastLogTerm && lastIndex <= lastLogIndex)
 }
+// =============================================================================================
 
 
 
-// lock
+
+
+
+
+// about commit --------------------------------------------------------------------------------
+func (rf *Raft) leaderCommit() {
+	start := rf.commitIndex
+	end := rf.log[len(rf.log) - 1].Index
+	for start < end {
+		cnt := 0
+		for peer := range rf.peers {
+			if rf.matchIndex[peer] >= start + 1 {
+				cnt += 1
+			} 
+		}
+
+		if cnt > len(rf.peers) / 2 {
+			start++
+		} else {
+			break
+		}
+	}
+
+	if rf.commitIndex < start {
+		
+		DPrintf("{Node %v} currentTerm %v leaderCommit rf.commitIndex %v to start %v\n", rf.me, rf.currentTerm, rf.commitIndex, start)
+		DPrintf("***************************************************************************************************\n")
+		rf.commitIndex = start
+		rf.applyCond.Signal()
+	}
+	
+}
+
+func (rf *Raft) followerCommit(leaderCommit int) {
+	rf.commitIndex = leaderCommit
+	// signal
+	rf.applyCond.Signal()
+}
+// ---------------------------------------------------------------------------------------------
+
+
+
+
+
+
+// goruntime xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 func (rf *Raft) timer() {
 	for !rf.killed() {
 		select {
 		case <- rf.heartBeatTime.C:
-			DPrintf("{Node %v} i can not breath heartbeat\n", rf.me)
-			DPrintf("***************************************************************************************************\n")
+			// DPrintf("{Node %v} i can not breath heartbeat\n", rf.me)
+			// DPrintf("***************************************************************************************************\n")
 			rf.mu.Lock()
 			if rf.state == LEADER {
 				rf.boardcast(true)
 				rf.refreshHeartBeatTime()
 			}
-			DPrintf("{Node %v} i can breath heartbeat\n", rf.me)
-			DPrintf("***************************************************************************************************\n")
+			// DPrintf("{Node %v} i can breath heartbeat\n", rf.me)
+			// DPrintf("***************************************************************************************************\n")
 			rf.mu.Unlock()
 
 		case <- rf.electionTime.C:
@@ -607,7 +614,6 @@ func (rf *Raft) timer() {
 	DPrintf("***************************************************************************************************\n")
 }
 
-// lock
 func (rf *Raft) applyLogs() {
 	for !rf.killed() {
 		rf.mu.Lock()
@@ -649,7 +655,6 @@ func (rf *Raft) applyLogs() {
 	DPrintf("***************************************************************************************************\n")
 }
 
-// lock
 func (rf *Raft) appendAndWait(peer int) {
 	rf.appendCond[peer].L.Lock()
 	defer rf.appendCond[peer].L.Unlock()
@@ -662,13 +667,12 @@ func (rf *Raft) appendAndWait(peer int) {
 	
 }
 
-// lock
 func (rf *Raft) needAppend(peer int) bool {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	return rf.state == LEADER && rf.matchIndex[peer] < len(rf.log) - 1
 }
-
+// xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 
 
@@ -692,8 +696,6 @@ func (rf *Raft) needAppend(peer int) bool {
 // term. the third return value is true if this server believes it is
 // the leader.
 //
-
-// lock
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
