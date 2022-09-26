@@ -222,7 +222,9 @@ https://pdos.csail.mit.edu/6.824/labs/raft-structure.txt
 
 https://thesquareplanet.com/blog/students-guide-to-raft/
 
-实验二是实现raft算法。很虐的一个实验。首先这是raft结构体，变量名和raft论文中的一样。
+实验二是实现raft算法。很虐的一个实验。
+
+### raft结构体(变量名和raft论文中一致)
 
 	type Raft struct {
 		mu        sync.Mutex          // Lock to protect shared access to this peer's state
@@ -273,8 +275,9 @@ make方法是创建一个新的raft节点。
 
 参考这位大佬的思路有利于我对多线程编程的理解，这一直是我的漏洞。通过channel、条件变量、goruntime这三个的使用，大大加深我对go多线程编程的理解。
 
+### 三种协程
 
-### timer（选举相关和发送log相关）
+##### timer（选举相关和发送log相关）
 
 timer函数使用select，一旦定时器超时，通过channel通知timer函数，这是go的特色
 
@@ -282,7 +285,7 @@ timer函数使用select，一旦定时器超时，通过channel通知timer函数
 
 + 若是心跳包超时并且当前状态是leader，发送心跳包boardcast()，该函数创建相关协程或者唤醒appendAndWait后马上返回，返回后刷新心跳时间
 
-### appendAndWait（发送log 相关）
+##### appendAndWait（发送log 相关）
 
 该协程每个peer(除了自己)都有一个对应，负责尽全力将新的log append到对应的peer中去。
 
@@ -290,7 +293,7 @@ timer函数使用select，一旦定时器超时，通过channel通知timer函数
 
 + 需要的话，我们调用append2peer将log发送给对应peer，该函数确保正确处理一切发送的结果，随后返回，继续上述循环
 
-### applyLogs（应用相关）
+##### applyLogs（应用相关）
 
 该协程负责尽全力将log应用到状态机中，也就是写入applyCh
 
