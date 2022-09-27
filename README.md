@@ -407,7 +407,7 @@ timer函数使用select，一旦定时器超时，通过channel通知timer函数
 
 ### 持久化
 
-再修改持久状态时我们调用persist存储即可
+在修改持久状态时我们调用persist存储即可
 
 
 
