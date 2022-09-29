@@ -410,6 +410,169 @@ timer函数使用select，一旦定时器超时，通过channel通知timer函数
 在修改持久状态时我们调用persist存储即可
 
 
+## lab3
+
+实验三是在实验二构建的raft协议上，写一个简单的分布式数据库，该分布式数据库支持get查找、put添加和append插入操作
+
+分为客户端和服务端，二者之间通过rpc交互，而服务端上层的数据库则通过channel和底层的raft交互，这是总体
+
+### client
+
+客户结构体
+
+	type Clerk struct {
+		servers []*labrpc.ClientEnd
+		// You will have to modify this struct.
+		clientId int64
+		leaderId int
+	}
+	
+##### Get
+
++ 调用makeGetArgs制作参数和返回值
+
++ 进入循环（注意一定要先制定参数再进入循环，不能循环制定参数，这样可能会重复添加）
+
++ rpc远程调用服务器端get
+
++ 若失败，将leaderid往下移一位继续（防止超时）
+
++ 若成功，读取结果判断
+
+	- OK：我们保留此时的leaderid，返回结果
+	- ErrNoKey：我们保留此时的leaderid，返回空字符串
+	- ErrWrongLeader：我们将leaderid往下移一位，继续
+	- ErrTimeOut：我们继续
+	- default：我们将leaderid往下移一位，继续
+
+
+##### PutAppend
+
++ 调用makePutAppendArgs制定参数和返回值
+
++ 进入循环（同上）
+
++ rpc远程调用服务器端put或append
+
++ 若失败，将leaderid往下移一位继续（防止超时）
+
++ 若成功，读取结果判断
+
+	- OK：我们保留此时的leaderid，返回结果
+	- ErrNoKey：不应该出现的错误，直接panic
+	- ErrWrongLeader：我们将leaderid往下移一位，继续
+	- ErrTimeOut：我们继续
+	- default：我们将leaderid往下移一位，继续
+	
+	
+对于参数，我们在原有参数的基础上加入了MsgId和lientId这两个唯一序列号，这样每个客户的一次操作都有唯一的一对序列号（客户号和操作号）记录下来，方便服务端查询是否重复操作
+
+
+### server
+
+服务器结构体：
+
+	type KVServer struct {
+		mu      sync.Mutex
+		me      int
+		rf      *raft.Raft
+		applyCh chan raft.ApplyMsg
+		stopCh  chan struct{}
+	
+		maxraftstate int // snapshot if log grows this big
+		// Your definitions here.
+		msgNotify   map[int64]chan NotifyMsg
+		lastApplies map[int64]msgId // last apply put/append msg
+		data        map[string]string
+	
+		persister      *raft.Persister
+		lastApplyIndex int
+		lastApplyTerm  int
+	}
+	
+op结构体，传递给raft的Command
+
+	type Op struct {
+		// Your definitions here.
+		// Field names must start with capital letters,
+		// otherwise RPC will break.
+		MsgId    msgId
+		ReqId    int64
+		ClientId int64
+		Key      string
+		Value    string
+		Method   string
+	}
+	
+##### StartKVServer
+
+服务器的初始化，这里强调几个关键的地方
+
++ 初始化msgNotify，这是存储reqid和对应channel的哈希表，用于applyCh接收到raft传入的值后通知相应等待的服务端
+
++ 初始化lastApplies，这是存储clientid和msgid的哈希表，用于查询客户最近一次操作的msgid，用于防止重复操作
+
++ 初始化data，这是数据库
+
++ 开启waitApplyCh()协程，该协程负责读取和raft之间的channel，即ApplyMsg，进行相应的操作，并且如有必要将信息传递给相应等待的服务端协程
+
+##### waitApplyCh
+
+读取ApplyMsg，进行相应的操作，写入对应channel
+
++ 使用select不断读取ApplyMsg
+
++ 读取到后判断是否合法，不合法则不处理
+
++ 通过op的相关字段判断操作是否重复
+
++ 不重复则进行相关put和append处理（如果是这两个操作）
+
++ 通过msgNotify判断是否有对应ch，有我们则将结果写入对应ch
+
+
+##### Get
+
+接收处理客户端的get请求
+
++ 首先判断自己是否是leader，不是则直接返回
+
++ 创建op，对于reqid我们使用rand随机生成
+
++ 之后调用waitCmd获取返回值，返回客户端
+
++ 返回
+
+##### PutAppend
+
+接收处理客户端的put和append请求
+
++ 首先判断自己是否是leader，不是则直接返回
+
++ 创建op，对于reqid我们使用rand随机生成
+
++ 之后调用waitCmd获取返回值，返回客户端
+
++ 返回
+
+##### waitCmd
+
++ 首先调用rf的start判断自己是否是leader，不是则直接返回
+
++ 创建channel ch，将op的reqid和channel加入msgNotify
+
++ 新建定时器，设置超时时间为0.5s，函数结束记得关闭定时器
+
++ 使用select等待ch和定时器
+
++ 若触发定时器，则返回超时，删除ch
+
++ 触发ch，则返回ch的返回值，删除ch，这里的ch实际上就是服务器上端的数据库调用raft的start，start开始处理op，处理完毕后将op传回ApplyMsg，waitApplyCh协程注意到，然后进行
+
+  相关数据库处理（get，put，append）然后通过op的相关信息查询到我们这里等待的channel，将操作的结果传入
+
+
+
 
 
 
