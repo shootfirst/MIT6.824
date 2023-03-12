@@ -181,7 +181,11 @@ follower选举时间超时后，变为candidate，currentTerm+1，投票给自�
 
 ### 安全性问题论证
 
-ps：领导人不能直接提交之前任期的条目
+##### 提交之前任期的日志（论文图8）
+
+leaders can only commit logs with term same as his own
+
+接下来是五大安全特性：
 
 ##### 选举安全特性
 
