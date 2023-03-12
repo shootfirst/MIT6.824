@@ -209,6 +209,9 @@ leaders can only commit logs with term same as his own
 
 
 
+
+
+
 ## 工业界应用扩展
 
 ### 日志压缩
@@ -245,4 +248,4 @@ leaders can only commit logs with term same as his own
 
 
 
-### raft优化
+## raft优化
