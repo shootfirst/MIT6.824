@@ -86,6 +86,12 @@ P1a：一个Acceptor只要尚未响应过任何编号大于N的Prepare请求，�
 
 
 
+
+
+
+
+
+
 ## Raft
 
 ## 基本概述
@@ -105,12 +111,21 @@ raft服务器三种角色：leader、candidate、follower
 + 如果term>currentTerm，那么清空voteFor，将currentTerm修改为term，将角色转换为follower
 
 
+代码总结：
+
+在每次rpc返回后，需要检测自己term或者角色是否改变，改变，则直接置之不理！
+
+
+
+
 
 ### 发起选举RequestVote
 
 参数：term candidateId lastLogIndex lastLogTerm
 
 返回值：term voteGranted
+
+##### 发送请求投票
 
 follower选举时间超时后，变为candidate，currentTerm+1，投票给自己，更新定时器。同步给其他所有节点发送请求投票。若：
 
@@ -120,11 +135,20 @@ follower选举时间超时后，变为candidate，currentTerm+1，投票给自�
 
 + 选举时间过，没有任何leader当选，继续开启新一轮选举
 
-收到请求投票：
++ 收到其他leader的心跳，并且term大于等于自己，变为follow（在appendrpc中实现）
+
+##### 收到请求投票：
 
 + 如果term>currentTerm，那么清空voteFor，将currentTerm修改为term，将角色转换为follower
 
-+ 若满足投票篇条件（voteFor为空，lastLogIndex>mine && lastLogTerm==mine || lastLogTerm>mine, 投给它
++ 日志至少和自己一样新, 投给它
+
+##### 后发起选举
+
+注意随机化时间，防止同时发起选举
+
+
+
 
 
 ### 同步日志AppendEntries
@@ -132,6 +156,8 @@ follower选举时间超时后，变为candidate，currentTerm+1，投票给自�
 参数：term leaderId prevLogIndex prevLogTerm entries[] leaderCommit
 
 返回值：term success
+
+##### 发送同步日志
 
 成为leader后，立即发送，或者收到用户端的log，或者心跳包超时后同步发送给所有其他节点
 
@@ -141,15 +167,15 @@ follower选举时间超时后，变为candidate，currentTerm+1，投票给自�
 
 + 失败则往前发送
 
-收到同步日志：
+##### 接收同步日志
 
 + 若term>=currentTerm，变为followers，清空voteFor，返回失败
 
-+ 若满足条件（prevLogIndex==mine && prevLogTerm == mine），添加到此之后，返回成功
++ 若满足条件（prevLogIndex==mine && prevLogTerm == mine），添加到此之后，检查是否能更新commitIndex，能我们则将其应用到状态机，返回成功
 
-+ 否则返回失败
++ 否则返回失败，同时，为了加速，这里可以附上本次冲突日志的任期上一次任期的开头任期的index
 
-+ 检查是否能更新commitIndex，能我们则将其应用到状态机
+
 
 
 
