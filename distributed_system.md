@@ -59,20 +59,6 @@
 三种角色：proposer，acceptor，learner
 
 
-#### Prepare
-
-proposor选择一个提案编号n，将其发送给多数acceptor
-
-acceptor收到之后，若其大于已经承诺过提案编号，则将其返回给proposer，并且将其改为n，如果已经accept过value了，则将value附上
-
-#### Accept
-
-proposor收到多数acceptor同意后，向多数acceptor发送accept请求，同时附上大多数acceptor中最大的value，如果没有，则附上自己的
-
-acceptor收到之后，若提案号和promise的相同，则接收该提案
-
-
-
 #### paxos算法推导历程
 
 
@@ -93,6 +79,19 @@ S中每个Acceptor都没有接受过编号小于N的提案。S中Acceptor接受�
 P1a：一个Acceptor只要尚未响应过任何编号大于N的Prepare请求，那么他就可以接受这个编号为N的提案。
 
 
+#### Prepare
+
+proposor选择一个提案编号n，将其发送给多数acceptor
+
+acceptor收到之后，若其大于已经承诺过提案编号，则将其返回给proposer，并且将其改为n，如果已经accept过value了，则将value附上
+
+#### Accept
+
+proposor收到多数acceptor同意后，向多数acceptor发送accept请求，同时附上大多数acceptor中最大的value，如果没有，则附上自己的
+
+acceptor收到之后，若提案号和promise的相同，则接收该提案
+
+
 
 
 
@@ -101,7 +100,7 @@ P1a：一个Acceptor只要尚未响应过任何编号大于N的Prepare请求，�
 
 ## Raft
 
-## 基本概述
+### 基本概述
 
 raft服务器三种角色：leader、candidate、follower
 
@@ -126,7 +125,7 @@ raft服务器三种角色：leader、candidate、follower
 
 
 
-### 发起选举RequestVote
+#### 发起选举RequestVote
 
 参数：term candidateId lastLogIndex lastLogTerm
 
@@ -158,7 +157,7 @@ follower选举时间超时后，变为candidate，currentTerm+1，投票给自�
 
 
 
-### 同步日志AppendEntries
+#### 同步日志AppendEntries
 
 参数：term leaderId prevLogIndex prevLogTerm entries[] leaderCommit
 
@@ -186,7 +185,7 @@ follower选举时间超时后，变为candidate，currentTerm+1，投票给自�
 
 
 
-### 安全性问题论证
+#### 安全性问题论证
 
 ##### 提交之前任期的日志（论文图8）
 
