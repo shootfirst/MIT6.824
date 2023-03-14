@@ -221,7 +221,11 @@ leaders can only commit logs with term same as his own
 
 ## 工业界应用扩展
 
-### 日志压缩
+### 安装快照
+
+参数：term leaderId lastIncludeIndex lastIncludeTerm offset data done
+
+返回值：term
 
 在实际中，日志增长会占据大量内存，所以需要日志压缩。一般数量到达某个阈值后压缩成快照。当leader需要同步压缩的日志时直接发送快照。
 
