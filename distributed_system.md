@@ -74,7 +74,7 @@ P2b：如果某个value为v的提案被选定了，那么之后任何Proposer提
 
 P2c：对于任意的N和V，如果提案[N, V]被提出，那么存在一个半数以上的Acceptor组成的集合S，满足以下两个条件中的任意一个：
 
-S中每个Acceptor都没有接受过编号小于N的提案。S中Acceptor接受过的最大编号的提案的value为V。
+S中每个Acceptor都没有接受过编号小于N的提案。v是S中Acceptor接受过小于n提案中，最大编号的提案。
 
 P1a：一个Acceptor只要尚未响应过任何编号大于N的Prepare请求，那么他就可以接受这个编号为N的提案。
 
