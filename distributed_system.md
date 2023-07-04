@@ -23,6 +23,14 @@
 
 ##### 一致性分类
 
+
+
+
+
+## 分布式事务
+
+### 一致性
+
 + 线性一致性：任何一次读都能读到某个数据的最近一次写的数据；系统中的所有进程，看到的操作顺序，都与全局时钟下的顺序一致；（说白了就是和单机一模一样）
 
 + 顺序一致性：允许对操作进行排序，就好像它们是以某种串行顺序执行一样，并要求属于某一进程的操作在排序后保持先后顺序不变
@@ -31,7 +39,7 @@
 
 + 最终一致性：不保证在任意时刻任意节点上的同一份数据都是相同的，但是不同节点上的同一份数据总是在向趋同的方向变化。
 
-#### CAP理论
+### CAP理论
 
 + 一致性
 
@@ -39,13 +47,21 @@
 
 + 分区容错性（必须存在）
 
-#### BASE理论
+### BASE理论
 
 + 基本可用
 
 + 软状态
 
 + 最终一致性
+  
+
+### 实现方案
+
+
+#### 2PC
+
+#### 3PC
 
 
 
@@ -219,9 +235,9 @@ leaders can only commit logs with term same as his own
 
 
 
-## 工业界应用扩展
+### 工业界应用扩展
 
-### 安装快照
+#### 安装快照
 
 参数：term leaderId lastIncludeIndex lastIncludeTerm offset data done
 
@@ -229,7 +245,7 @@ leaders can only commit logs with term same as his own
 
 在实际中，日志增长会占据大量内存，所以需要日志压缩。一般数量到达某个阈值后压缩成快照。当leader需要同步压缩的日志时直接发送快照。
 
-### 禅让
+#### 禅让
 
 在实际中，有时候需要更换leader，直接停机leader会浪费，可以采取禅让机制。
 
@@ -237,7 +253,7 @@ leaders can only commit logs with term same as his own
 
 + 向target发送TImeOutNowRPC，target收到之后马上开启选举
 
-### 预投票
+#### 预投票
 
 在实际中，暂时脱离集群的节点重新回来后会干扰到集群的运行。为了防止它使leader退位。
 
@@ -247,16 +263,13 @@ leaders can only commit logs with term same as his own
 
 + 当前节点已经和 leader 失联（electionTimeout）
 
-### 客户端响应
+#### 客户端响应
 
 为了防止客户端超时重传，在上层需要防止重复的提交
 
-### 配置变更
+#### 配置变更
 
 ##### 变更一台
 
 ##### 变更多台
 
-
-
-## raft优化
